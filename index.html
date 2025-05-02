@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>D3 Tree with Pie Chart Nodes</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    .link {
+      fill: none;
+      stroke: #ccc;
+      stroke-width: 1.5px;
+    }
+    .node text {
+      font-size: 10px;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+  </style>
+</head>
+<body>
+<svg width="1200" height="1000"></svg>
+<script>
+const width = 1200;
+const height = 1000;
+const radius = Math.min(width, height) / 2 - 100;
+
+const svg = d3.select("svg")
+  .attr("viewBox", [-width / 2, -height / 2, width, height])
+  .call(d3.zoom()
+    .scaleExtent([0.3, 5])
+    .on("zoom", (event) => {
+      g.attr("transform", event.transform);
+    }));
+
+const g = svg.append("g");
+const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+d3.json("tree_output.json").then(data => {
+  const root = d3.hierarchy(data);
+  const treeLayout = d3.cluster()
+    .size([2 * Math.PI, radius*5]);  
+
+
+  // const treeLayout = d3.cluster()
+  // .nodeSize([3, 6])
+  // .separation((a, b) => {
+  //   return (a.parent === b.parent ? 77 : 77) * 1.5;
+  // });
+
+    treeLayout(root);
+
+
+
+
+  const project = (angle, r) => {
+    return [Math.cos(angle - Math.PI / 2) * r, Math.sin(angle - Math.PI / 2) * r];
+  };
+
+
+  g.selectAll(".link")
+    .data(root.links())
+    .enter().append("path")
+    .attr("class", "link")
+    .attr("fill", "none")
+    .attr("stroke", "#ccc")
+    .attr("stroke-width", 1.5)
+    .attr("d", d => {
+      const [sx, sy] = project(d.source.x, d.source.y);
+      const [tx, ty] = project(d.target.x, d.target.y);
+      return `M${sx},${sy}L${tx},${ty}`;
+    });
+
+
+  const node = g.selectAll(".node")
+    .data(root.descendants())
+    .enter().append("g")
+    .attr("class", "node")
+    .attr("transform", d => {
+      const [x, y] = project(d.x, d.y);
+      return `translate(${x},${y})`;
+    });
+
+
+  node.each(function(d) {
+    const pieData = d.data.pieValues || [1];
+    const nodeRadius = d.data.radius || 3;
+    const pie = d3.pie()(pieData);
+    const arc = d3.arc().innerRadius(0).outerRadius(nodeRadius);
+
+    d3.select(this)
+      .selectAll("path")
+      .data(pie)
+      .enter()
+      .append("path")
+      .attr("d", arc)
+      .attr("fill", (d, i) => color(i));
+  });
+
+  // 添加节点标签（可选）
+// node.append("text")
+//   .attr("dy", d => d.data.radius + 12)
+//   .attr("text-anchor", "middle")
+//   .attr("alignment-baseline", "hanging")
+//   .text(d => d.data.name);
+});
+</script>
+</body>
+</html>
