@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>D3 Tree with Pie Chart Nodes (Cartesian)</title>
     <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         body {
             font-family: sans-serif;
@@ -24,156 +25,263 @@
     </style>
 </head>
 
-<body>
-    <svg width="1200" height="1000"></svg>
+<body style="margin: 0; height: 100vh;">
+    <div id="app" style="display: flex; flex-direction: column; height: 100vh;">
+
+        <!-- Header -->
+        <div id="header"
+            style=" padding-left: 10px; display: flex;  align-items: center;   height: 5vh; background-color: rgb(238, 168, 39);">
+            <h4>Read2TreeView</h4>
+            <!-- <div>ss</div> -->
+
+        </div>
+
+
+
+        <!-- Main content area -->
+        <div id="main" style="display: flex; height: 90vh;">
+
+            <!-- Left panel -->
+            <div id="tree_panel" style="width: 80%; background-color: lightblue; border: 1px solid black;">
+                <svg style="width: 100%; height: 100%; background-color: rgb(238, 241, 241);"></svg>
+            </div>
+
+            <!-- Right panel -->
+            <div id="info_panel" style="width: 20%; background-color: rgb(6, 245, 173); padding: 3px">
+
+                <div> <button @click="showTab('info')">Information</button> <button
+                        @click="showTab('help')">Help</button> </div>
+
+                <div id="info" v-show="tabs.info">
+
+                    <!-- {{node_list[0]}} -->
+
+                </div>
+                <div id="help" v-show="tabs.help">bb </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div id="footer"
+            style=" padding-left: 10px; display: flex;  align-items: center; height: 5vh; background-color: rgb(238, 168, 39);">
+            <div>
+                ss
+            </div>
+        </div>
+    </div>
+
+
+
     <script>
 
-        const width = 1500;
-        const height = 1000;
 
-        const svg = d3.select("svg")
-            .attr("viewBox", [0, 0, width, height])
-            .call(d3.zoom()
-                .scaleExtent([0.3, 15])
-                .on("zoom", (event) => {
-                    g.attr("transform", event.transform);
-                }));
+        const { createApp, reactive } = Vue;
 
-        const g = svg.append("g").attr("transform", "translate(80,80)");
+        const app = createApp({
+            data() {
+                return {
+                    title: "Read2TreeView",
+                    selectedNodeName: null,
+                    selectedNodeMeta: null,
+                    tabs: {
+                        "info": true,
+                        "help": false,
+                    },
+                    node_list: [],
+                };
+            },
+            methods: {
+                onNodeClick(d) {
+                    this.selectedNodeName = d.data.name || "(unnamed)";
+                    this.selectedNodeMeta = d.data.meta || null;
+                },
 
-        function getColors(categories) {
-            const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-            const colorMap = {};
-            categories.forEach(cat => colorMap[cat] = colorScale(cat));
-            return colorMap;
-        }
+                getPieChartData(items, colorMap) {
+                    const countMap = {};
+                    for (const item of items) countMap[item] = (countMap[item] || 0) + 1;
+                    const total = items.length;
+                    return Object.entries(countMap).map(([label, count]) => ({
+                        label,
+                        value: count / total,
+                        count,
+                        color: colorMap[label] || '#cccccc'
+                    }));
+                },
 
-        function getPieChartData(items, colorMap) {
-            const countMap = {};
-            for (const item of items) countMap[item] = (countMap[item] || 0) + 1;
-            const total = items.length;
-            return Object.entries(countMap).map(([label, count]) => ({
-                label,
-                value: count / total,
-                count,
-                color: colorMap[label] || '#cccccc'
-            }));
-        }
 
-        function countAllDescendants(node) {
-            if (!node.children || node.children.length === 0) {
-                node.data.nchild = 0;
-                return 0;
-            }
-            const count = node.children.reduce((sum, child) => sum + 1 + countAllDescendants(child), 0);
-            node.data.nchild = count;
-            return count;
-        }
+                showTab(tab) {
+                    for (const key in this.tabs) {
+                        this.tabs[key] = false;
+                    }
+                    this.tabs[tab] = true;
+                },
+                drawTree() {
 
-        function createRadiusScaler(root) {
-            const counts = root.descendants().map(d => d.data.nchild);
-            const min = Math.sqrt(Math.min(...counts) + 1);
-            const max = Math.sqrt(Math.max(...counts) + 1);
-            return (n) => {
-                const scaled = Math.sqrt(n + 1);
-                return ((scaled - min) / (max - min)) * (10 - 3) + 3;
-            };
-        }
+                    const vueThis = this;
 
-        function collectPieValues(node, metaname, categorySet) {
-            if (!node.children || node.children.length === 0) {
-                const value = node.data.meta[metaname];
-                node.data.pieValues = [value];
-                categorySet.add(value);
-                return [value];
-            }
-            const values = node.children.flatMap(child => collectPieValues(child, metaname, categorySet));
-            node.data.pieValues = values;
-            return values;
-        }
+                    let tree_panel = document.getElementById("tree_panel");
+                    // tree_panel.style.width = "80%";
+                    const width = Math.max(tree_panel.clientWidth, 1500);
+                    const height = Math.max(tree_panel.clientHeight, 900);
 
-        function assignLeafColors(node, metaname, colorMap) {
-            if (!node.children || node.children.length === 0) {
-                node.data.color = colorMap[node.data.meta[metaname]];
-            } else {
-                node.children.forEach(child => assignLeafColors(child, metaname, colorMap));
-            }
-        }
+                    const svg = d3.select("svg")
+                        .attr("viewBox", [0, 0, width, height])
+                        .call(d3.zoom()
+                            .scaleExtent([0.3, 15])
+                            .on("zoom", (event) => {
+                                g.attr("transform", event.transform);
+                            }));
 
-        function renderLinks(group, root) {
-            group.selectAll(".link")
-                .data(root.links())
-                .enter()
-                .append("path")
-                .attr("class", "link")
-                .attr("d", d => `M${d.source.x},${d.source.y}V${d.target.y}H${d.target.x}`);
-        }
+                    const g = svg.append("g").attr("transform", "translate(80,80)");
 
-        function renderNodes(group, root, colors) {
-            const nodes = group.selectAll(".node")
-                .data(root.descendants())
-                .enter().append("g")
-                .attr("class", "node")
-                .attr("transform", d => `translate(${d.x},${d.y})`);
+                    function getColors(categories) {
+                        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+                        const colorMap = {};
+                        categories.forEach(cat => colorMap[cat] = colorScale(cat));
+                        return colorMap;
+                    }
 
-            nodes.each(function (d) {
-                const r = d.data.radius || 3;
-                const nodeGroup = d3.select(this);
 
-                if (!d.children || d.children.length === 0) {
-                    const side = r * 2;
-                    const height = Math.sqrt(3) / 2 * side;
-                    const points = [
-                        [0, -height / 2],
-                        [-side / 2, height / 2],
-                        [side / 2, height / 2]
-                    ];
-                    const pathData = d3.line()(points.concat([points[0]]));
-                    nodeGroup.append("path")
-                        .attr("d", pathData)
-                        .attr("fill", d.data.color)
-                        .attr("stroke", "black")
-                        .attr("stroke-width", 0.0);
-                } else {
-                    const pieData = getPieChartData(d.data.pieValues, colors);
-                    const pie = d3.pie().value(d => d.value)(pieData);
-                    const arc = d3.arc().innerRadius(0).outerRadius(r);
-                    nodeGroup.selectAll("path")
-                        .data(pie)
-                        .enter()
-                        .append("path")
-                        .attr("d", arc)
-                        .attr("fill", d => d.data.color);
+
+                    function countAllDescendants(node) {
+                        if (!node.children || node.children.length === 0) {
+                            node.data.nchild = 0;
+                            return 0;
+                        }
+                        const count = node.children.reduce((sum, child) => sum + 1 + countAllDescendants(child), 0);
+                        node.data.nchild = count;
+                        return count;
+                    }
+
+                    function createRadiusScaler(root) {
+                        const counts = root.descendants().map(d => d.data.nchild);
+                        const min = Math.sqrt(Math.min(...counts) + 1);
+                        const max = Math.sqrt(Math.max(...counts) + 1);
+                        return (n) => {
+                            const scaled = Math.sqrt(n + 1);
+                            return ((scaled - min) / (max - min)) * (10 - 3) + 3;
+                        };
+                    }
+
+                    function collectPieValues(node, metaname, categorySet) {
+                        if (!node.children || node.children.length === 0) {
+                            const value = node.data.meta[metaname];
+                            node.data.pieValues = [value];
+                            categorySet.add(value);
+                            return [value];
+                        }
+                        const values = node.children.flatMap(child => collectPieValues(child, metaname, categorySet));
+                        node.data.pieValues = values;
+                        return values;
+                    }
+
+                    function assignLeafColors(node, metaname, colorMap) {
+                        if (!node.children || node.children.length === 0) {
+                            node.data.color = colorMap[node.data.meta[metaname]];
+                        } else {
+                            node.children.forEach(child => assignLeafColors(child, metaname, colorMap));
+                        }
+                    }
+
+                    function renderLinks(group, root) {
+                        group.selectAll(".link")
+                            .data(root.links())
+                            .enter()
+                            .append("path")
+                            .attr("class", "link")
+                            .attr("d", d => `M${d.source.x},${d.source.y}V${d.target.y}H${d.target.x}`);
+                    }
+
+                    function renderNodes(group, root, colors) {
+                        const nodes = group.selectAll(".node")
+                            .data(root.descendants())
+                            .enter().append("g")
+                            .attr("class", "node")
+                            .attr("transform", d => `translate(${d.x},${d.y})`);
+
+                        nodes.each(function (d) {
+                            const r = d.data.radius || 3;
+                            const nodeGroup = d3.select(this);
+
+                            if (!d.children || d.children.length === 0) {
+                                const side = r * 2;
+                                const height = Math.sqrt(3) / 2 * side;
+                                const points = [
+                                    [0, -height / 2],
+                                    [-side / 2, height / 2],
+                                    [side / 2, height / 2]
+                                ];
+                                const pathData = d3.line()(points.concat([points[0]]));
+                                nodeGroup.append("path")
+                                    .attr("d", pathData)
+                                    .attr("fill", d.data.color)
+                                    .attr("stroke", "black")
+                                    .attr("stroke-width", 0.0);
+                            } else {
+                                const pieData = vueThis.getPieChartData(d.data.pieValues, colors);
+                                const pie = d3.pie().value(d => d.value)(pieData);
+                                const arc = d3.arc().innerRadius(0).outerRadius(r);
+                                nodeGroup.selectAll("path")
+                                    .data(pie)
+                                    .enter()
+                                    .append("path")
+                                    .attr("d", arc)
+                                    .attr("fill", d => d.data.color);
+                            }
+                        });
+                    }
+
+                    d3.json("tree_output.json").then(data => {
+                        const root = d3.hierarchy(data);
+                        countAllDescendants(root);
+
+                        const radiusScaler = createRadiusScaler(root);
+                        root.descendants().forEach(d => d.data.radius = radiusScaler(d.data.nchild));
+
+                        const treeLayout = d3.tree()
+                            .size([width, height])
+                            .separation((a, b) => {
+                                const r1 = a.data.radius * 2 || 3;
+                                const r2 = b.data.radius * 2 || 3;
+                                return (r1 + r2 + 10) / 8;
+                            });
+                        treeLayout(root);
+
+                        const pieCategories = new Set();
+                        collectPieValues(root, "host", pieCategories);
+                        const colorMap = getColors(Array.from(pieCategories));
+                        assignLeafColors(root, "host", colorMap);
+
+                        renderLinks(g, root);
+                        renderNodes(g, root, colorMap);
+
+                        this.node_list = root.descendants().map(d => {
+                            // console.log(d);
+                            return {
+                                id: d.id,
+                                data: d.data,
+                                depth: d.depth,
+                                height: d.height,
+                                x: d.x,
+                                y: d.y,
+                            }
+                        });
+                        this.colormap = colorMap;
+
+                        console.log(this.node_list[0]);
+
+                    });
                 }
-            });
-        }
-
-        d3.json("tree_output.json").then(data => {
-            const root = d3.hierarchy(data);
-            countAllDescendants(root);
-
-            const radiusScaler = createRadiusScaler(root);
-            root.descendants().forEach(d => d.data.radius = radiusScaler(d.data.nchild));
-
-            const treeLayout = d3.tree()
-                .size([width*0.9, height])
-                .separation((a, b) => {
-                    const r1 = a.data.radius * 2 || 3;
-                    const r2 = b.data.radius * 2 || 3;
-                    return (r1 + r2 + 10) / 6;
-                });
-            treeLayout(root);
-
-            const pieCategories = new Set();
-            collectPieValues(root, "host", pieCategories);
-            const colorMap = getColors(Array.from(pieCategories));
-            assignLeafColors(root, "host", colorMap);
-
-            renderLinks(g, root);
-            renderNodes(g, root, colorMap);
+            },
+            mounted() {
+                this.drawTree();
+            }
         });
-    </script>
 
+        app.mount("#app");
+
+    </script>
 
 </body>
 
