@@ -56,3 +56,10 @@ tree = build_tree(root_id)
 # 保存 JSON
 with open("tree_output.json", "w") as f:
     json.dump(tree, f, indent=2)
+
+tree_str = json.dumps(tree)
+
+with open("index4.html", "r") as f:
+    with open("index4_out.html", "w") as f2:
+        template = f.read()
+        f2.write(template.replace("[/*inject_data*/]", tree_str))
