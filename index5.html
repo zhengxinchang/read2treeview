@@ -179,16 +179,16 @@
         <!-- Main content area -->
         <div id="main" style="display: flex; height: 90vh;">
 
-            <!-- <div id="left_panel"
+            <div id="left_panel"
                 style="width: 15%; background-color: #FAFAFA; padding-left: 3px; padding-right: 3px;  overflow: auto;border: 1px solid black;border-right: none;">
 
                 <div style="height: 50%; border-bottom: 1px solid black;">Tree info</div>
                 <div style="height: 49%;">Metadata</div>
 
-            </div> -->
+            </div>
 
             <!-- Left panel -->
-            <div id="tree_panel" style="width: 85%; background-color: lightblue; border: 1px solid black;">
+            <div id="tree_panel" style="width: 70%; background-color: lightblue; border: 1px solid black;">
                 <svg style="width: 100%; height: 100%; background-color: #FAFAFA;"></svg>
             </div>
 
@@ -637,31 +637,79 @@
                             }
 
 
-                            if (!d.children || d.children.length === 0) {
-                                const side = r * 2;
-                                const height = Math.sqrt(3) / 2 * side;
-                                const points = [
-                                    [0, -height / 2],
-                                    [-side / 2, height / 2],
-                                    [side / 2, height / 2]
-                                ];
-                                const pathData = d3.line()(points.concat([points[0]]));
 
-                                nodeGroup.append("path")
+                            if (!d.children || d.children.length === 0) {
+                                // const side = r * 2;
+                                // const height = Math.sqrt(3) / 2 * side;
+                                // const points = [
+                                //     [0, -height / 2],
+                                //     [-side / 2, height / 2],
+                                //     [side / 2, height / 2]
+                                // ];
+                                // const pathData = d3.line()(points.concat([points[0]]));
+                                // nodeGroup.append("path")
+
+                                //     .attr("d", pathData)
+                                //     .attr("fill", d.data.color)
+                                //     .attr("stroke", "black")
+                                //     .attr("stroke-width", 0.0);
+
+
+                                const side = r * 2;
+                                const strokeWidth = 0.25;
+
+                                const unit = side / 10; 
+
+                                // outer rect
+                                nodeGroup.append("rect")
                                     .attr("class", "outline")
-                                    .attr("d", pathData)
+                                    .attr("x", -side / 2)
+                                    .attr("y", -side / 2)
+                                    .attr("width", side)
+                                    .attr("height", side)
                                     .attr("fill", "none")
                                     .attr("stroke", "black")
-                                    .attr("stroke-width", 0);
+                                    .attr("stroke-width", 0); 
 
-                                nodeGroup.append("path")
+                                // left top (7x7)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2)
+                                    .attr("y", -side / 2)
+                                    .attr("width", unit * 7)
+                                    .attr("height", unit * 7)
+                                    .attr("fill", d.data.color || "gray")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
 
-                                    .attr("d", pathData)
-                                    .attr("fill", d.data.color)
-                                    .attr("stroke", "black")
-                                    .attr("stroke-width", 0.0);
+                                // right top (3x7)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2 + unit * 7)
+                                    .attr("y", -side / 2)
+                                    .attr("width", unit * 3)
+                                    .attr("height", unit * 7)
+                                    .attr("fill", "white")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
 
+                                // left bottom (7x3)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2)
+                                    .attr("y", -side / 2 + unit * 7)
+                                    .attr("width", unit * 7)
+                                    .attr("height", unit * 3)
+                                    .attr("fill", "white")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
 
+                                // right bottom (3x3)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2 + unit * 7)
+                                    .attr("y", -side / 2 + unit * 7)
+                                    .attr("width", unit * 3)
+                                    .attr("height", unit * 3)
+                                    .attr("fill", "white")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
 
                                 vueThis.num_leaf_nodes += 1;
                             } else {
@@ -737,12 +785,17 @@
                             y: d.y,
                         }
                     });
+                    // this.colormap = colorMap;
+
+                    // console.log(this.node_list[0]);
+
+                    // });
                 },
 
                 async prepareTree() {
-                    const data = tree_data; // Replace with your actual data
+                    // const data = tree_data; // Replace with your actual data
 
-                    // const data = await d3.json("tree_output.json");
+                    const data = await d3.json("tree_output.json");
                     const tree = d3.hierarchy(data);
                     this.root_tree = tree;
 
