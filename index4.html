@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>D3 Tree with Pie Chart Nodes (Cartesian)</title>
+    <title>Read2TreeView</title>
     <script src="https://d3js.org/d3.v6.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
@@ -92,6 +92,52 @@
         button:active {
             transform: scale(0.97);
         }
+
+        .help-tooltip-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .help-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: transparent;
+            /* color: white; */
+            text-align: center;
+            line-height: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        .tooltip-content {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            position: absolute;
+            top: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 100;
+            white-space: normal;
+            /* ✅ 允许换行 */
+            width: 200px;
+            /* ✅ 设置最大宽度 */
+            word-wrap: break-word;
+            /* ✅ 允许单词换行 */
+        }
+
+        .help-tooltip-wrapper:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -105,27 +151,26 @@
             <h4 style="margin: 0;">Read2TreeView</h4>
 
             <div style="display: flex; align-items: center; gap: 10px;">
-                <label for="currMeta">Select the metadata</label>
-                <select id="currMeta" name="currMeta" v-model="selectedMeta">
-                    <option v-for="meta in all_metas" :value="meta">{{ meta }}</option>
-                </select>
+                <label for="currMeta">Main Palette <helper>The main palette is used to color all nodes. Non-leaf
+                        nodes (pie charts) are fully colored using the main palette. For leaf nodes (squares), the
+                        top-left corner is colored with the main palette, while the rest is filled using the extra
+                        palette. Select the corresponding metadata from the dropdown menu; the palette will appear to
+                        the right of the selection box. Sample node colors can be configured using the boxes on the
+                        right.
 
-                <button @click="showPalette = !showPalette">Palette</button>
-
-                <!-- Palette dropdown positioned absolutely relative to #header -->
-                <div v-show="showPalette"
-                    style="position: absolute; top: 5vh; right: 20px; background-color: white; border: 1px solid black; padding: 10px; z-index: 10;color:black;">
-                    <h4 style="margin: 0 0 8px 0;">Color Palette</h4>
-                    <div style="max-height:600px; overflow-y: auto;">
-                        <div v-for="(color, label) in color_map" :key="label"
-                            style="display: flex; align-items: center; margin-bottom: 4px;">
-                            <div :style="{ backgroundColor: color, width: '20px', height: '20px', marginRight: '5px' }">
-                            </div>
-                            {{ label }}
-                        </div>
-                    </div>
-
-                </div>
+                    </helper>
+                    <select id="currMeta" name="currMeta" v-model="selectedMeta">
+                        <option v-for="meta in all_metas" :value="meta">{{ meta }}</option>
+                    </select>
+                    <palette :color-map="color_map"></palette>
+                </label>
+                |
+                <label for="currMeta">Extra Palettes <helper>
+                        The extra palette is used to render square leaf nodes (representing sample nodes). The top-left
+                        corner shows the main palette color, and additional colors can be selected from the dropdown
+                        menu.
+                    </helper>
+                </label>
 
                 <span>| #Node {{ node_list && node_list.length }} | #Sample: {{ num_leaf_nodes }}</span>
             </div>
@@ -134,37 +179,59 @@
         <!-- Main content area -->
         <div id="main" style="display: flex; height: 90vh;">
 
+            <div id="left_panel"
+                style="width: 15%; background-color: #FAFAFA; padding-left: 3px; padding-right: 3px;  overflow: auto;border: 1px solid black;border-right: none;">
+
+                <div style="height: 50%; border-bottom: 1px solid black;">Tree info</div>
+                <div style="height: 49%;">Metadata</div>
+
+            </div>
+
             <!-- Left panel -->
-            <div id="tree_panel" style="width: 80%; background-color: lightblue; border: 1px solid black;">
+            <div id="tree_panel" style="width: 70%; background-color: lightblue; border: 1px solid black;">
                 <svg style="width: 100%; height: 100%; background-color: #FAFAFA;"></svg>
             </div>
 
             <!-- Right panel -->
-            <div id="info_panel"
-                style="width: 20%; background-color: #FAFAFA; padding: 3px;  overflow: auto;border: 1px solid black;border-left: none;">
+            <div id="right_panel"
+                style="width: 15%; background-color: #FAFAFA; padding: 3px;  overflow: auto;border: 1px solid black;border-left: none;">
 
                 <div style="display: flex; justify-content: space-between;">
-                    <span> <button @click="showTab('info')">Information</button></span>
+                    <span> <button @click="showTab('info')">Node information</button></span>
                     <span><button @click="showTab('help')">Help</button></span>
 
                 </div>
 
                 <div id="info" v-show="tabs.info && isShowInfoTab">
 
-                    <!-- {{node_list[0]}} -->
-
-
                     <div>
-                        <div style=" border: 1px solid #ccc;">
-                            <div>Node id: {{ selectedNode && selectedNode.id || null }} </div>
-                            <div>Node name: {{ selectedNode && selectedNode.name || null }} </div>
-                            <div>Node type: {{ isLeafNode2Label(selectedNode) }}</div>
-                            <div>Branch Length: {{ selectedNode && selectedNode.branch_length || null }}</div>
-                            <div>Sample szie: {{getSampleSize(selectedNode)}} </div>
+                        <div style="margin-top: 10px;">
 
+                            <collapse-panel>
+                                <template #title>
+                                    <strong>Basic:</strong>
+
+                                </template>
+                                <template #content>
+                                    <div style="padding: 4px; font-size: 12px;">
+                                        <div> <strong>Node id:</strong> {{ selectedNode && selectedNode.id || null }}
+                                        </div>
+                                        <div><strong>Node name:</strong> {{ selectedNode && selectedNode.name || null }}
+                                        </div>
+                                        <div><strong>Node type:</strong> {{ isLeafNode2Label(selectedNode) }}</div>
+                                        <div><strong>Branch Length:</strong> {{ selectedNode &&
+                                            selectedNode.branch_length || null }}</div>
+                                        <div><strong>Sample szie:</strong> {{getSampleSize(selectedNode)}} <helper
+                                                :color="'#000'">
+                                                Sample Size only count the samples(leaf nodes). Non-leaf nodes will be
+                                                ignored.</helper>
+                                        </div>
+                                    </div>
+                                </template>
+                            </collapse-panel>
                         </div>
 
-                        <div>
+                        <div style="margin-top: 10px;">
 
                             <collapse-panel>
                                 <template #title>
@@ -185,19 +252,18 @@
                                             :key="item.label" :style="{ backgroundColor: item.color, padding: '4px' }">
                                             <div style="display: flex; justify-content: space-between;">
                                                 <span>{{ item.label }}</span>
-                                                <span>{{ item.count }} [{{ item.value.toFixed(2) }}]</span>
+                                                <span>{{ item.count }} [{{ (item.value *100) .toFixed(2) }}%]</span>
                                             </div>
                                         </div>
 
                                     </div>
 
                                 </template>
+
                             </collapse-panel>
-
-
                         </div>
 
-                        <div>
+                        <div style="margin-top: 10px;">
 
                             <collapse-panel>
                                 <template #title>
@@ -228,40 +294,8 @@
                                     </div>
                                 </template>
                             </collapse-panel>
-
-
-                            <!-- <div style="max-height: 300px; overflow: auto; border: 1px solid #ccc;">
-                                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                                    <thead>
-                                        <tr>
-                                            <th v-for="header in selectedNodeChildrenMata.table_header" :key="header"
-                                                style="position: sticky; top: 0; background: #f0f0f0; padding: 4px;">
-                                                {{ header }}
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="row in selectedNodeChildrenMata.table_data"
-                                            :key="row['Sample Name']">
-                                            <td v-for="header in selectedNodeChildrenMata.table_header" :key="header"
-                                                style="padding: 4px;">
-                                                {{ row[header] }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div> -->
-
-
-
-
                         </div>
-
-
-                        <!-- {{selectedNode}} -->
                     </div>
-
-
                 </div>
                 <div id="help" v-show="tabs.help">
 
@@ -353,6 +387,7 @@
                     showPalette: false,
                     svg: null,
                     isShowInfoTab: false,
+                    highlightedNodeId: null,
 
                 };
             },
@@ -408,7 +443,7 @@
                     let children = d.descendants();
 
                     children = children.filter(d => { return (d.data.meta && (!d.children || d.children.length == 0)) });
-                    console.log(children);
+                    // console.log(children);
 
                     let table_header = Object.keys(children[0].data.meta);
                     // table_header.unshift("Sample Name");
@@ -428,8 +463,23 @@
 
                 },
 
-
                 onNodeClick(d) {
+
+                    console.log(d);
+                    if (this.highlightedNodeId !== null) {
+                        d3.select(`#node-${this.highlightedNodeId} .outline`)
+                            .attr("stroke", "black")
+                            .attr("stroke-width", 0);
+                    }
+
+                    d3.select(`#node-${d.data.id} .outline`)
+                        .attr("stroke", "red")
+                        .attr("stroke-width", 2);
+
+                    this.highlightedNodeId = d.data.id;
+
+
+
 
                     this.selectedNodeName = d.data.name || "(unnamed)";
                     this.selectedNodeMeta = d.data.meta || null;
@@ -438,9 +488,6 @@
                     this.selectedNodeChildrenMata = null;
                     let childrenmeta = this.getLeafMetaAsTable(d);
                     this.selectedNodeChildrenMata = childrenmeta;
-                    console.log(childrenmeta);
-                    // console.log(this.getPieChartData(d.data.pieValues, this.colormap));
-                    // console.log(this.selectedNode);
                     this.isShowInfoTab = true;
                 },
 
@@ -569,6 +616,7 @@
                             .data(root.descendants())
                             .enter().append("g")
                             .attr("class", "node")
+                            .attr("id", d => `node-${d.data.id}`)
                             .attr("transform", d => `translate(${d.x},${d.y})`);
 
                         let all_metas = new Set();
@@ -591,22 +639,89 @@
 
 
                             if (!d.children || d.children.length === 0) {
+                                // const side = r * 2;
+                                // const height = Math.sqrt(3) / 2 * side;
+                                // const points = [
+                                //     [0, -height / 2],
+                                //     [-side / 2, height / 2],
+                                //     [side / 2, height / 2]
+                                // ];
+                                // const pathData = d3.line()(points.concat([points[0]]));
+                                // nodeGroup.append("path")
+
+                                //     .attr("d", pathData)
+                                //     .attr("fill", d.data.color)
+                                //     .attr("stroke", "black")
+                                //     .attr("stroke-width", 0.0);
+
+
                                 const side = r * 2;
-                                const height = Math.sqrt(3) / 2 * side;
-                                const points = [
-                                    [0, -height / 2],
-                                    [-side / 2, height / 2],
-                                    [side / 2, height / 2]
-                                ];
-                                const pathData = d3.line()(points.concat([points[0]]));
-                                nodeGroup.append("path")
-                                    .attr("d", pathData)
-                                    .attr("fill", d.data.color)
+                                const strokeWidth = 0.25;
+
+                                const unit = side / 10; 
+
+                                // outer rect
+                                nodeGroup.append("rect")
+                                    .attr("class", "outline")
+                                    .attr("x", -side / 2)
+                                    .attr("y", -side / 2)
+                                    .attr("width", side)
+                                    .attr("height", side)
+                                    .attr("fill", "none")
                                     .attr("stroke", "black")
-                                    .attr("stroke-width", 0.0);
+                                    .attr("stroke-width", 0); 
+
+                                // left top (7x7)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2)
+                                    .attr("y", -side / 2)
+                                    .attr("width", unit * 7)
+                                    .attr("height", unit * 7)
+                                    .attr("fill", d.data.color || "gray")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
+
+                                // right top (3x7)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2 + unit * 7)
+                                    .attr("y", -side / 2)
+                                    .attr("width", unit * 3)
+                                    .attr("height", unit * 7)
+                                    .attr("fill", "white")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
+
+                                // left bottom (7x3)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2)
+                                    .attr("y", -side / 2 + unit * 7)
+                                    .attr("width", unit * 7)
+                                    .attr("height", unit * 3)
+                                    .attr("fill", "white")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
+
+                                // right bottom (3x3)
+                                nodeGroup.append("rect")
+                                    .attr("x", -side / 2 + unit * 7)
+                                    .attr("y", -side / 2 + unit * 7)
+                                    .attr("width", unit * 3)
+                                    .attr("height", unit * 3)
+                                    .attr("fill", "white")
+                                    .attr("stroke", "#ccc")
+                                    .attr("stroke-width", strokeWidth);
+
                                 vueThis.num_leaf_nodes += 1;
                             } else {
                                 const pieData = vueThis.getPieChartData(d.data.pieValues, colors);
+
+                                nodeGroup.append("circle")
+                                    .attr("class", "outline")
+                                    .attr("r", r)
+                                    .attr("fill", "none")
+                                    .attr("stroke", "black")
+                                    .attr("stroke-width", 0);  // 默认隐藏边框
+
                                 const pie = d3.pie().value(d => d.value)(pieData);
                                 const arc = d3.arc().innerRadius(0).outerRadius(r);
                                 nodeGroup.selectAll("path")
@@ -618,7 +733,7 @@
                             }
                         });
 
-                        console.log(all_metas);
+                        // console.log(all_metas);
                         vueThis.all_metas = Array.from(all_metas);
 
                     }
@@ -629,7 +744,7 @@
                     // d3.json("tree_output.json").then(data => {
                     // const root = d3.hierarchy(data);
 
-                    console.log(root);
+                    // console.log(root);
 
                     countAllDescendants(root);
 
@@ -652,8 +767,8 @@
                     this.color_map = colorMap;
 
 
-                    console.log(this.selectedMeta);
-                    console.log(this.color_map);
+                    // console.log(this.selectedMeta);
+                    // console.log(this.color_map);
                     assignLeafColors(root, vueThis.selectedMeta, this.color_map);
 
                     renderLinks(g, root);
@@ -678,7 +793,9 @@
                 },
 
                 async prepareTree() {
-                    const data = tree_data; // Replace with your actual data
+                    // const data = tree_data; // Replace with your actual data
+
+                    const data = await d3.json("tree_output.json");
                     const tree = d3.hierarchy(data);
                     this.root_tree = tree;
 
@@ -701,7 +818,7 @@
 
         app.component('collapse-panel', {
             template: `
-                    <div>
+                    <div style="background-color: #f7f5f5; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px;">
                     <div style="font-size: 12px; display: flex; align-items: center; justify-content: space-between; background: #eee; padding: 6px 10px; cursor: pointer;" @click="toggle">
                         <slot name="title"></slot>
                         <button style="font-size: 12px;">{{ isOpen ? 'Hide' : 'Show' }}</button>
@@ -722,6 +839,66 @@
                 }
             }
         });
+
+
+        app.component('helper', {
+            props: {
+                color: {
+                    type: String,
+                    default: '#FFF' // 默认文字颜色
+                }
+            },
+            template: `
+            <div class="help-tooltip-wrapper">
+            <div class="help-icon" :style="{ color: color }">ⓘ</div>
+            <div class="tooltip-content">
+                <div style="padding: 4px; font-size: 12px; margin-top: 10px; max-width: 400px; word-wrap: break-word; white-space: normal;">
+                <slot></slot>
+                </div>
+            </div>
+            </div>
+        `
+        });
+
+
+
+        app.component('palette', {
+            props: ['colorMap'],
+            data() {
+                return {
+                    show: false
+                };
+            },
+            template: `
+            <div style="position: relative; display: inline-block;">
+            <button @click="show = !show">Palette</button>
+
+            <div v-show="show" style="
+                position: absolute;
+                top: 110%;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: white;
+                border: 1px solid black;
+                padding: 10px;
+                z-index: 10;
+                color: black;
+                min-width: 150px;
+            ">
+                <h4 style="margin: 0 0 8px 0;">Color Palette</h4>
+                <div style="max-height:200px; overflow-y: auto;">
+                <div v-for="(color, label) in colorMap" :key="label"
+                    style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <div :style="{ backgroundColor: color, width: '20px', height: '20px', marginRight: '5px' }"></div>
+                    {{ label }}
+                </div>
+                </div>
+            </div>
+            </div>
+        `
+        });
+
+
 
 
         app.mount("#app");

@@ -57,4 +57,4 @@ tree_str = json.dumps(tree)
 with open("index4.html", "r") as f:
     with open("index4_out.html", "w") as f2:
         template = f.read()
-        f2.write(template.replace("[/*inject_data*/]", tree_str))
+        f2.write(template.replace("[/*inject_data*/]", tree_str)) 
